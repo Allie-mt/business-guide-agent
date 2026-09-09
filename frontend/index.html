@@ -36,9 +36,9 @@
     <p style="margin-top: 12px;"><a href="/admin.html"
         style="color: #4f46e5; text-decoration: none; font-size: 13px;">📊 管理后台（项目/文档管理）→</a></p>
   </div>
+  <div id="app"></div>
   <script type="module">
-    import React from "react";
-    import { createRoot } from "react-dom/client";
+    import { createApp, h } from "vue";
     import { ChatWidget } from "./src/index";
 
     const config = {
@@ -51,9 +51,11 @@
       placeholder: "输入你的问题...",
     };
 
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    createRoot(container).render(React.createElement(ChatWidget, { config }));
+    createApp({
+      render() {
+        return h(ChatWidget, { config });
+      },
+    }).mount("#app");
   </script>
 </body>
 

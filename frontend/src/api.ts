@@ -1,4 +1,4 @@
-import { ChatResponse, BGAWidgetConfig } from "./types";
+import type { ChatResponse, BGAWidgetConfig } from "./types";
 
 interface ApiResponse<T> {
   success: boolean;
@@ -99,72 +99,7 @@ export class ApiClient {
         body: formData,
       },
     );
-    if (!res.ok) throw new Error(`uploadScreenshot failed: ${res.status}`);
-    const result = await res.json();
-    return result.data?.url ?? result.url;
-  }
-
-  async uploadDocument(
-    projectId: string,
-    file: File,
-  ): Promise<{ id: string; originalName: string; ingestStatus: string }> {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("projectId", projectId);
-
-    const headers: Record<string, string> = {};
-    if (this.token) headers["Authorization"] = `Bearer ${this.token}`;
-
-    const res = await fetch(`${this.baseUrl}/api/v1/documents/upload`, {
-      method: "POST",
-      headers,
-      body: formData,
-    });
-    return this.unwrap<{
-      id: string;
-      originalName: string;
-      ingestStatus: string;
-    }>(res);
-  }
-
-  async listDocuments(
-    projectId: string,
-  ): Promise<
-    {
-      id: string;
-      originalName: string;
-      ingestStatus: string;
-      chunkCount?: number;
-      createdAt: string;
-    }[]
-  > {
-    const res = await fetch(
-      `${this.baseUrl}/api/v1/documents/project/${projectId}`,
-      {
-        headers: this.headers(),
-      },
-    );
-    return this.unwrap<
-      {
-        id: string;
-        originalName: string;
-        ingestStatus: string;
-        chunkCount?: number;
-        createdAt: string;
-      }[]
-    >(res);
-  }
-
-  async triggerIngest(
-    documentId: string,
-  ): Promise<{ id: string; ingestStatus: string }> {
-    const res = await fetch(
-      `${this.baseUrl}/api/v1/documents/${documentId}/ingest`,
-      {
-        method: "POST",
-        headers: this.headers(),
-      },
-    );
-    return this.unwrap<{ id: string; ingestStatus: string }>(res);
+    const json = await res.json();
+    return json.data?.url ?? json.url ?? "";
   }
 }

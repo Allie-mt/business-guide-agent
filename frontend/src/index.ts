@@ -1,4 +1,4 @@
-export { ChatWidget } from "./ChatWidget";
+export { default as ChatWidget } from "./ChatWidget.vue";
 export type {
   BGAWidgetConfig,
   ChatMessage,

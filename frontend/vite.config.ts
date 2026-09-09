@@ -1,18 +1,18 @@
 import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
+import vue from "@vitejs/plugin-vue";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [vue()],
   build: {
     lib: {
-      entry: "src/index.tsx",
+      entry: "src/index.ts",
       name: "BGAChatWidget",
       fileName: "bga-chat-widget",
     },
     rollupOptions: {
-      external: ["react", "react-dom"],
+      external: ["vue"],
       output: {
-        globals: { react: "React", "react-dom": "ReactDOM" },
+        globals: { vue: "Vue" },
       },
     },
   },
