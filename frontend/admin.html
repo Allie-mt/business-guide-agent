@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BGA 管理后台</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f0f2f5;
+      color: #1f2937;
+      min-height: 100vh;
+    }
+
+    .header {
+      background: #4f46e5;
+      color: #fff;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+    }
+
+    .header h1 {
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .header a {
+      color: rgba(255, 255, 255, 0.8);
+      text-decoration: none;
+      font-size: 14px;
+    }
+
+    .header a:hover {
+      color: #fff;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 32px auto;
+      padding: 0 24px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .card h2 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .project-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .project-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .project-card:hover {
+      border-color: #4f46e5;
+      box-shadow: 0 2px 8px rgba(79, 70, 229, 0.15);
+    }
+
+    .project-card.active {
+      border-color: #4f46e5;
+      background: #f5f3ff;
+    }
+
+    .project-card .name {
+      font-weight: 600;
+      font-size: 15px;
+      margin-bottom: 4px;
+    }
+
+    .project-card .id {
+      font-size: 11px;
+      color: #9ca3af;
+      word-break: break-all;
+    }
+
+    .project-card .meta {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 8px;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: #4f46e5;
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: #4338ca;
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px solid #d1d5db;
+      color: #374151;
+    }
+
+    .btn-outline:hover {
+      background: #f9fafb;
+    }
+
+    .btn-danger {
+      background: #ef4444;
+      color: #fff;
+    }
+
+    .btn-danger:hover {
+      background: #dc2626;
+    }
+
+    .btn-sm {
+      padding: 4px 10px;
+      font-size: 12px;
+    }
+
+    .doc-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .doc-table th {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 2px solid #e5e7eb;
+      font-size: 13px;
+      color: #6b7280;
+      font-weight: 600;
+    }
+
+    .doc-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #f3f4f6;
+      font-size: 14px;
+    }
+
+    .doc-table tr:hover {
+      background: #f9fafb;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .status-completed {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .status-processing {
+      background: #fef9c3;
+      color: #854d0e;
+    }
+
+    .status-failed {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .status-pending {
+      background: #f3f4f6;
+      color: #6b7280;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: #9ca3af;
+    }
+
+    .empty-state .icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    .upload-area {
+      border: 2px dashed #d1d5db;
+      border-radius: 8px;
+      padding: 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 16px;
+    }
+
+    .upload-area:hover {
+      border-color: #4f46e5;
+      background: #f5f3ff;
+    }
+
+    .upload-area.dragover {
+      border-color: #4f46e5;
+      background: #ede9fe;
+    }
+
+    .upload-area .icon {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+
+    .upload-area .hint {
+      font-size: 13px;
+      color: #9ca3af;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .toast {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      z-index: 10000;
+      animation: slideIn 0.3s ease;
+    }
+
+    .toast-success {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .toast-error {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    .loading {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="header">
+    <h1>📊 BGA 管理后台</h1>
+    <a href="/">← 返回对话页面</a>
+  </div>
+  <div class="container">
+    <div class="card">
+      <h2>📁 项目管理</h2>
+      <div id="project-list" class="project-grid">
+        <div class="empty-state">
+          <div class="icon">⏳</div>加载中...
+        </div>
+      </div>
+      <div style="margin-top: 16px; display: flex; gap: 8px; align-items: center;">
+        <input type="text" id="new-project-name" placeholder="输入项目名称" style="
+            padding: 6px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+            width: 200px;
+          " onkeydown="if(event.key==='Enter') createProject()" />
+        <button class="btn btn-primary btn-sm" onclick="createProject()">+ 新建项目</button>
+      </div>
+    </div>
+
+    <div id="doc-section" class="card" style="display: none;">
+      <h2>📄 文档管理 — <span id="current-project-name"></span></h2>
+      <div id="upload-area" class="upload-area" onclick="document.getElementById('file-input').click()"
+        ondragover="event.preventDefault(); this.classList.add('dragover')"
+        ondragleave="this.classList.remove('dragover')"
+        ondrop="event.preventDefault(); this.classList.remove('dragover'); handleDrop(event)">
+        <div class="icon">📤</div>
+        <div>点击或拖拽文件到此处上传</div>
+        <div class="hint">支持 PDF、TXT、MD 格式</div>
+      </div>
+      <input type="file" id="file-input" accept=".pdf,.txt,.md" multiple style="display:none"
+        onchange="handleFileSelect(event)" />
+      <div id="doc-list"></div>
+      <div style="margin-top: 12px; display: flex; gap: 8px;">
+        <button class="btn btn-outline btn-sm" onclick="loadDocs()">🔄 刷新</button>
+        <button class="btn btn-primary btn-sm" onclick="ingestAll()">▶ 全部摄取</button>
+        <a id="chat-link" href="/" target="_blank" class="btn btn-outline btn-sm" style="text-decoration: none;">💬
+          打开对话</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = window.__BGA_API_URL__ || "http://localhost:3000";
+    const API = API_URL + "/api/v1";
+    let currentProjectId = null;
+    let projects = [];
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const preselectedProject = urlParams.get("projectId");
+
+    function toast(msg, type = "success") {
+      const el = document.createElement("div");
+      el.className = `toast toast-${type}`;
+      el.textContent = msg;
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 3000);
+    }
+
+    async function api(path, opts = {}) {
+      const res = await fetch(`${API}${path}`, {
+        headers: { "Content-Type": "application/json" },
+        ...opts,
+      });
+      if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+      const json = await res.json();
+      return json.data;
+    }
+
+    async function loadProjects() {
+      try {
+        projects = await api("/projects");
+        const el = document.getElementById("project-list");
+        if (!projects.length) {
+          el.innerHTML = '<div class="empty-state"><div class="icon">📁</div>暂无项目，点击下方按钮创建</div>';
+          return;
+        }
+        el.innerHTML = projects.map(p => `
+            <div class="project-card ${p.id === currentProjectId ? 'active' : ''}" onclick="selectProject('${p.id}')">
+              <div class="name">${p.name || '未命名项目'}</div>
+              <div class="id">${p.id}</div>
+              <div class="meta">创建于 ${new Date(p.createdAt).toLocaleDateString()}</div>
+            </div>
+          `).join("");
+      } catch (e) {
+        toast("加载项目失败: " + e.message, "error");
+      }
+    }
+
+    async function createProject() {
+      const input = document.getElementById("new-project-name");
+      const name = input.value.trim();
+      if (!name) {
+        toast("请输入项目名称", "error");
+        input.focus();
+        return;
+      }
+      try {
+        await api("/projects", { method: "POST", body: JSON.stringify({ name }) });
+        input.value = "";
+        toast("项目创建成功");
+        loadProjects();
+      } catch (e) {
+        toast("创建失败: " + e.message, "error");
+      }
+    }
+
+    function selectProject(id) {
+      currentProjectId = id;
+      const p = projects.find(x => x.id === id);
+      document.getElementById("current-project-name").textContent = p?.name || id;
+      document.getElementById("doc-section").style.display = "block";
+      const chatLink = document.getElementById("chat-link");
+      if (chatLink) chatLink.href = `/?projectId=${id}`;
+      loadProjects();
+      loadDocs();
+    }
+
+    async function loadDocs() {
+      if (!currentProjectId) return;
+      try {
+        const docs = await api(`/documents/project/${currentProjectId}`);
+        const el = document.getElementById("doc-list");
+        if (!docs.length) {
+          el.innerHTML = '<div class="empty-state"><div class="icon">📄</div>暂无文档，上传文件后可自动向量化</div>';
+          return;
+        }
+        el.innerHTML = `
+            <table class="doc-table">
+              <thead><tr><th>文件名</th><th>大小</th><th>状态</th><th>分块数</th><th>操作</th></tr></thead>
+              <tbody>${docs.map(d => `
+                <tr>
+                  <td>📝 ${d.originalName}</td>
+                  <td>${(d.fileSize / 1024).toFixed(1)} KB</td>
+                  <td><span class="status-badge status-${d.ingestStatus}">${d.ingestStatus === 'completed' ? '✓ 已摄取' :
+            d.ingestStatus === 'processing' ? '⏳ 处理中' :
+              d.ingestStatus === 'failed' ? '✗ 失败' : '待摄取'
+          }</span></td>
+                  <td>${d.chunkCount || 0}</td>
+                  <td class="actions">
+                    ${d.ingestStatus !== 'completed' && d.ingestStatus !== 'processing' ?
+            `<button class="btn btn-primary btn-sm" onclick="ingestDoc('${d.id}')">▶ 摄取</button>` : ''}
+                    <button class="btn btn-danger btn-sm" onclick="deleteDoc('${d.id}')">🗑</button>
+                  </td>
+                </tr>
+              `).join("")}</tbody>
+            </table>
+          `;
+      } catch (e) {
+        toast("加载文档失败: " + e.message, "error");
+      }
+    }
+
+    async function handleFileSelect(e) {
+      const files = e.target.files;
+      if (!files.length) return;
+      for (const file of files) await uploadFile(file);
+      e.target.value = "";
+      loadDocs();
+    }
+
+    async function handleDrop(e) {
+      const files = e.dataTransfer.files;
+      if (!files.length) return;
+      for (const file of files) await uploadFile(file);
+      loadDocs();
+    }
+
+    async function uploadFile(file) {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("projectId", currentProjectId);
+      try {
+        const res = await fetch(`${API}/documents/upload`, { method: "POST", body: formData });
+        if (!res.ok) throw new Error(await res.text());
+        toast(`${file.name} 上传成功`);
+      } catch (e) {
+        toast(`${file.name} 上传失败: ${e.message}`, "error");
+      }
+    }
+
+    async function ingestDoc(docId) {
+      try {
+        await api(`/documents/${docId}/ingest`, { method: "POST" });
+        toast("摄取已触发");
+        setTimeout(loadDocs, 2000);
+      } catch (e) {
+        toast("摄取失败: " + e.message, "error");
+      }
+    }
+
+    async function ingestAll() {
+      if (!currentProjectId) return;
+      try {
+        const docs = await api(`/documents/project/${currentProjectId}`);
+        const pending = docs.filter(d => d.ingestStatus !== 'completed' && d.ingestStatus !== 'processing');
+        if (!pending.length) { toast("所有文档已摄取"); return; }
+        for (const d of pending) {
+          await api(`/documents/${d.id}/ingest`, { method: "POST" });
+        }
+        toast(`已触发 ${pending.length} 个文档的摄取`);
+        setTimeout(loadDocs, 3000);
+      } catch (e) {
+        toast("批量摄取失败: " + e.message, "error");
+      }
+    }
+
+    async function deleteDoc(docId) {
+      if (!confirm("确定删除该文档？")) return;
+      try {
+        await api(`/documents/${docId}`, { method: "DELETE" });
+        toast("文档已删除");
+        loadDocs();
+      } catch (e) {
+        toast("删除失败: " + e.message, "error");
+      }
+    }
+
+    loadProjects();
+
+    if (preselectedProject) {
+      selectProject(preselectedProject);
+    } else {
+      const defaultProjectId = "966ce4f1-b36a-4e9c-813c-343cca323caa";
+      if (defaultProjectId) selectProject(defaultProjectId);
+    }
+  </script>
+</body>
+
+</html>
