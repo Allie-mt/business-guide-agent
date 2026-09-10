@@ -1,8 +1,21 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, computed } from "vue";
+import { ref, shallowRef, watch, nextTick, computed } from "vue";
 import MarkdownIt from "markdown-it";
 import type { ChatMessage as ChatMsg, BGAWidgetConfig } from "./types";
 import { ApiClient } from "./api";
+
+function uuid(): string {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
 
 const props = defineProps<{
   config: BGAWidgetConfig;
@@ -23,7 +36,7 @@ const bottomRef = ref<HTMLDivElement>();
 const inputRef = ref<HTMLTextAreaElement>();
 const fileInputRef = ref<HTMLInputElement>();
 
-const client = ref(new ApiClient(props.config));
+const client = shallowRef(new ApiClient(props.config));
 
 const isDark = computed(() => props.config.theme === "dark");
 
@@ -73,7 +86,7 @@ async function handleSend() {
   if (!text || loading.value) return;
 
   const userMsg: ChatMsg = {
-    id: crypto.randomUUID(),
+    id: uuid(),
     role: "user",
     content: text,
     timestamp: Date.now(),
@@ -89,7 +102,7 @@ async function handleSend() {
     const sid = await ensureSession();
 
     if (streaming.value) {
-      const assistantId = crypto.randomUUID();
+      const assistantId = uuid();
       const assistantMsg: ChatMsg = {
         id: assistantId,
         role: "assistant",
@@ -130,7 +143,7 @@ async function handleSend() {
         currentScreenshotUrl,
       );
       const assistantMsg: ChatMsg = {
-        id: crypto.randomUUID(),
+        id: uuid(),
         role: "assistant",
         content: res.content ?? res.answer ?? "",
         timestamp: Date.now(),
@@ -145,7 +158,7 @@ async function handleSend() {
     }
   } catch (err) {
     messages.value.push({
-      id: crypto.randomUUID(),
+      id: uuid(),
       role: "assistant",
       content: `⚠️ 请求失败: ${(err as Error).message}`,
       timestamp: Date.now(),
