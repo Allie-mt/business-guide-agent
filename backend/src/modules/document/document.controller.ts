@@ -34,9 +34,12 @@ export class DocumentController {
     @UploadedFile() file: Express.Multer.File,
     @Body("projectId") projectId: string,
   ): Promise<Document> {
+    const originalName = Buffer.from(file.originalname, "latin1").toString(
+      "utf8",
+    );
     return this.documentService.uploadAndCreate(
       projectId,
-      file.originalname,
+      originalName,
       file.buffer,
       file.mimetype,
     );
@@ -49,7 +52,10 @@ export class DocumentController {
   async uploadScreenshot(
     @UploadedFile() file: Express.Multer.File,
   ): Promise<{ url: string }> {
-    const storageKey = `screenshots/${Date.now()}_${file.originalname}`;
+    const originalName = Buffer.from(file.originalname, "latin1").toString(
+      "utf8",
+    );
+    const storageKey = `screenshots/${Date.now()}_${originalName}`;
     await this.documentService.uploadScreenshot(
       storageKey,
       file.buffer,

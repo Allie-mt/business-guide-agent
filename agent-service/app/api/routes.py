@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from app.prompt.injection_guard import check_injection, sanitize_input
 from app.graph.agent_graph import agent_app
+from app.config.settings import settings
 
 router = APIRouter()
 
@@ -61,6 +62,8 @@ class PipelineIngestRequest(BaseModel):
     project_id: str = Field(..., description="项目ID")
     file_url: str = Field(..., description="文件下载URL（MinIO预签名地址）")
     document_id: str | None = Field(None, description="文档ID，用于回调状态更新")
+    mime_type: str | None = Field(None, description="文件MIME类型")
+    original_name: str | None = Field(None, description="原始文件名")
     chunk_size: int = 500
     chunk_overlap: int = 50
     extract_graph: bool = True
@@ -120,17 +123,28 @@ async def chat_stream(request: StreamRequest):
     initial_state = _build_initial_state(request)
 
     async def event_generator():
+        streamed_answer = ""
         try:
             async for event in agent_app.astream_events(initial_state, version="v2"):
                 kind = event.get("event", "")
                 data = event.get("data", {})
                 name = event.get("name", "")
 
-                if kind == "on_chain_end" and name == "answer_generation":
+                if kind == "on_chain_stream" and name == "answer_generation":
+                    chunk = data.get("chunk", {})
+                    if isinstance(chunk, dict) and "answer" in chunk:
+                        full_answer = chunk["answer"]
+                        if len(full_answer) > len(streamed_answer):
+                            new_token = full_answer[len(streamed_answer):]
+                            streamed_answer = full_answer
+                            yield f"data: {json.dumps({'type': 'token', 'content': new_token})}\n\n"
+
+                elif kind == "on_chain_end" and name == "answer_generation":
                     output = data.get("output", {})
-                    answer = output.get("answer", "") if isinstance(output, dict) else ""
-                    if answer:
-                        yield f"data: {json.dumps({'type': 'answer', 'content': answer})}\n\n"
+                    if isinstance(output, dict):
+                        final_answer = output.get("answer", "")
+                        if final_answer and not streamed_answer:
+                            yield f"data: {json.dumps({'type': 'answer', 'content': final_answer})}\n\n"
 
                 elif kind == "on_chain_end" and name == "intent_recognition":
                     output = data.get("output", {}) if isinstance(data.get("output"), dict) else {}
@@ -216,15 +230,37 @@ async def ingest_graph(request: GraphIngestRequest):
 async def ingest_pipeline(request: PipelineIngestRequest):
     import tempfile
     import httpx
+    import os
     from app.ingestion.pipeline import ingest_full_pipeline
+
+    MIME_TO_EXT = {
+        "application/pdf": ".pdf",
+        "text/plain": ".txt",
+        "text/markdown": ".md",
+    }
 
     try:
         async with httpx.AsyncClient(timeout=120) as client:
             resp = await client.get(request.file_url)
             resp.raise_for_status()
 
-        suffix = request.file_url.split("?")[0].rsplit(".", 1)[-1] if "." in request.file_url else "pdf"
-        with tempfile.NamedTemporaryFile(suffix=f".{suffix}", delete=False) as tmp:
+        suffix = None
+        if request.mime_type and request.mime_type in MIME_TO_EXT:
+            suffix = MIME_TO_EXT[request.mime_type]
+        if not suffix and request.original_name and "." in request.original_name:
+            ext = request.original_name.rsplit(".", 1)[-1].lower()
+            if ext in ("pdf", "txt", "md"):
+                suffix = f".{ext}"
+        if not suffix:
+            url_path = request.file_url.split("?")[0]
+            if "." in url_path:
+                ext = url_path.rsplit(".", 1)[-1].lower()
+                if ext in ("pdf", "txt", "md"):
+                    suffix = f".{ext}"
+        if not suffix:
+            suffix = ".pdf"
+
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
             tmp.write(resp.content)
             tmp_path = tmp.name
 
@@ -236,9 +272,60 @@ async def ingest_pipeline(request: PipelineIngestRequest):
             extract_graph=request.extract_graph,
         )
 
-        import os
         os.unlink(tmp_path)
 
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Pipeline 摄取失败: {str(e)}")
+
+
+class DebugRetrievalRequest(BaseModel):
+    project_id: str = Field(..., description="项目ID")
+    query: str = Field(..., description="测试查询")
+    top_k: int = Field(5, description="返回数量")
+
+
+@router.post("/debug/retrieval")
+async def debug_retrieval(request: DebugRetrievalRequest):
+    from app.retrieval.milvus_client import MilvusRetriever
+    from pymilvus import MilvusClient as PyMilvusClient
+
+    collection_name = f"{settings.MILVUS_COLLECTION_PREFIX}{request.project_id.replace('-', '_')}"
+
+    milvus_client = PyMilvusClient(
+        uri=f"http://{settings.MILVUS_HOST}:{settings.MILVUS_PORT}"
+    )
+
+    collection_exists = milvus_client.has_collection(collection_name)
+
+    collection_info = {}
+    if collection_exists:
+        col_stats = milvus_client.get_collection_stats(collection_name)
+        collection_info = {
+            "name": collection_name,
+            "exists": True,
+            "row_count": col_stats.get("row_count", 0) if isinstance(col_stats, dict) else str(col_stats),
+        }
+    else:
+        collection_info = {"name": collection_name, "exists": False, "row_count": 0}
+
+    all_collections = milvus_client.list_collections()
+
+    search_results = []
+    if collection_exists:
+        try:
+            retriever = MilvusRetriever(collection_name=collection_name)
+            search_results = await retriever.search(query=request.query, top_k=request.top_k)
+        except Exception as e:
+            search_results = [{"error": str(e)}]
+
+    return {
+        "collection": collection_info,
+        "all_collections": all_collections,
+        "search_results": search_results,
+        "milvus_host": settings.MILVUS_HOST,
+        "milvus_port": settings.MILVUS_PORT,
+        "embedding_provider": settings.EMBEDDING_PROVIDER,
+        "embedding_model": settings.EMBEDDING_MODEL,
+        "embedding_dimension": settings.EMBEDDING_DIMENSION,
+    }

@@ -1,8 +1,12 @@
+import logging
+
 from pymilvus import MilvusClient, DataType
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.embeddings import HuggingFaceEmbeddings
 
 from app.config.settings import settings
+
+logger = logging.getLogger(__name__)
 
 
 def _get_embedding():
@@ -57,9 +61,17 @@ class MilvusRetriever:
         )
 
     async def search(self, query: str, top_k: int = 5) -> list[dict]:
+        if not self.client.has_collection(self.collection_name):
+            logger.warning("Milvus collection不存在: %s", self.collection_name)
+            return []
+
         self._ensure_collection()
 
         query_vector = await self._embedding.aembed_query(query)
+        logger.info(
+            "Milvus搜索: collection=%s, query_vector_dim=%d, top_k=%d",
+            self.collection_name, len(query_vector), top_k,
+        )
 
         results = self.client.search(
             collection_name=self.collection_name,

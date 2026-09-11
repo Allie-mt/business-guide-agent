@@ -115,34 +115,49 @@ export class ChatService {
     query: string,
     imageUrl?: string,
   ): AsyncGenerator<string> {
-    const response = await fetch(`${getAgentServiceUrl()}/api/v1/chat/stream`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        project_id: projectId,
-        query,
-        image_url: imageUrl,
-      }),
-    });
+    const url = `${getAgentServiceUrl()}/api/v1/chat/stream`;
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_id: projectId,
+          query,
+          image_url: imageUrl,
+        }),
+      });
+    } catch (err) {
+      throw new Error(`Agent Service fetch failed: ${(err as Error).message}`);
+    }
 
     if (!response.ok) {
-      throw new Error(`Agent Service stream failed: ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(
+        `Agent Service stream failed: ${response.status} - ${errorText}`,
+      );
     }
 
     const reader = response.body?.getReader();
     if (!reader) throw new Error("No readable stream");
 
     const decoder = new TextDecoder();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split("\n").filter((l) => l.startsWith("data: "));
-      for (const line of lines) {
-        const data = line.slice(6);
-        if (data === "[DONE]") return;
-        yield data;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n").filter((l) => l.startsWith("data: "));
+        for (const line of lines) {
+          const data = line.slice(6);
+          if (data === "[DONE]") return;
+          yield data;
+        }
       }
+    } catch (err) {
+      throw new Error(
+        `Agent Service stream read failed: ${(err as Error).message}`,
+      );
     }
   }
 }

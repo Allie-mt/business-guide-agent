@@ -1,4 +1,8 @@
+import logging
+
 from app.graph.state import AgentState
+
+logger = logging.getLogger(__name__)
 
 
 def context_combiner(state: AgentState) -> dict:
@@ -22,5 +26,10 @@ def context_combiner(state: AgentState) -> dict:
             context_parts.append(f"### 关系 {i}\n{rel.get('description', str(rel))}\n")
 
     combined_context = "\n".join(context_parts) if context_parts else "未找到相关上下文信息。"
+
+    logger.info(
+        "上下文合并: strategy=%s, vector_results=%d, graph_results=%d, context_len=%d",
+        strategy, len(vector_results), len(graph_results), len(combined_context),
+    )
 
     return {"combined_context": combined_context}

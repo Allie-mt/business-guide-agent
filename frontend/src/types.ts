@@ -13,6 +13,8 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: number;
+  imageUrl?: string;
+  _citationsOpen?: boolean;
   metadata?: {
     intent?: string;
     citations?: Citation[];

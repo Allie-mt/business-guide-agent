@@ -52,6 +52,8 @@ export class ChatController {
 
     const sendSse = (data: string) => {
       res.write(`data: ${data}\n\n`);
+      const raw = res as unknown as { flush?: () => void };
+      if (typeof raw.flush === "function") raw.flush();
     };
 
     try {

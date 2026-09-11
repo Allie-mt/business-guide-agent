@@ -25,7 +25,8 @@ export class DocumentService {
     fileBuffer: Buffer,
     mimeType: string,
   ): Promise<Document> {
-    const storageKey = `projects/${projectId}/documents/${Date.now()}_${originalName}`;
+    const safeName = originalName.replace(/[^\w\u4e00-\u9fff.-]/g, "_");
+    const storageKey = `projects/${projectId}/documents/${Date.now()}_${safeName}`;
 
     await this.minioService.upload(
       storageKey,
@@ -44,7 +45,9 @@ export class DocumentService {
     });
     const saved = await this.docRepo.save(doc);
 
-    await this._enqueueIngest(saved);
+    this._triggerIngestAsync(saved).catch((err) =>
+      this.logger.warn(`自动摄取触发失败，已入队等待: ${err.message}`),
+    );
 
     return saved;
   }
@@ -82,8 +85,8 @@ export class DocumentService {
 
   async triggerIngest(id: string): Promise<Document> {
     const doc = await this.findOne(id);
-    if (doc.ingestStatus === "processing") {
-      throw new Error(`文档 ${id} 正在处理中，请勿重复触发`);
+    if (doc.ingestStatus === "completed") {
+      return doc;
     }
 
     await this.updateIngestStatus(id, "processing");
@@ -101,6 +104,8 @@ export class DocumentService {
             project_id: doc.projectId,
             file_url: downloadUrl,
             document_id: doc.id,
+            mime_type: doc.mimeType,
+            original_name: doc.originalName,
           }),
         },
       );
@@ -140,14 +145,41 @@ export class DocumentService {
     return this.minioService.getPresignedUrl(storageKey);
   }
 
-  private async _enqueueIngest(doc: Document): Promise<void> {
-    const payload = JSON.stringify({
-      documentId: doc.id,
-      projectId: doc.projectId,
-      storageKey: doc.storageKey,
-      mimeType: doc.mimeType,
-    });
-    await this.redisService.set(`ingest:pending:${doc.id}`, payload, 86400);
-    await this.redisService.set(`ingest:queue:${doc.id}`, doc.id, 86400);
+  private async _triggerIngestAsync(doc: Document): Promise<void> {
+    await this.updateIngestStatus(doc.id, "processing");
+
+    try {
+      const downloadUrl = await this.minioService.getPresignedUrl(
+        doc.storageKey,
+      );
+      const response = await fetch(
+        `${getAgentServiceUrl()}/api/v1/ingest/pipeline`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            project_id: doc.projectId,
+            file_url: downloadUrl,
+            document_id: doc.id,
+            mime_type: doc.mimeType,
+            original_name: doc.originalName,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Agent Service 摄取失败: ${errorText}`);
+      }
+
+      const result = await response.json();
+      const chunkCount =
+        result.vector?.total_chunks || result.graph?.entity_count || 0;
+
+      await this.updateIngestStatus(doc.id, "completed", undefined, chunkCount);
+    } catch (err) {
+      this.logger.error(`自动摄取失败: ${(err as Error).message}`);
+      await this.updateIngestStatus(doc.id, "failed", (err as Error).message);
+    }
   }
 }

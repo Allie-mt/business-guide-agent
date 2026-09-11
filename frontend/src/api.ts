@@ -56,11 +56,13 @@ export class ApiClient {
     sessionId: string,
     content: string,
     imageUrl?: string,
+    signal?: AbortSignal,
   ): AsyncGenerator<string> {
     const res = await fetch(`${this.baseUrl}/api/v1/chat/stream`, {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify({ sessionId, content, imageUrl }),
+      signal,
     });
     if (!res.ok) {
       const body = await res.text();
